@@ -97,8 +97,15 @@ class SourceRecord:
 
     @property
     def has_public_source(self) -> bool:
-        """True neu trang co it nhat mot file .mq5/.mq4/.mqh tai duoc cong khai."""
-        return any(a.extension in {"mq5", "mq4", "mqh"} for a in self.attachments)
+        """True neu trang co it nhat mot file .mq5/.mq4/.mqh tai duoc cong khai.
+
+        Record doc lai tu SQLite khong con danh sach attachments, nen dua vao
+        extension cua file da luu.
+        """
+        sources = {"mq5", "mq4", "mqh"}
+        if any(a.extension in sources for a in self.attachments):
+            return True
+        return bool(self.local_path) and self.extension in sources
 
     def to_row(self) -> dict:
         d = asdict(self)

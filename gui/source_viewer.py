@@ -310,7 +310,7 @@ class SourceViewer(QWidget):
         matches = find_matches(
             self.editor.toPlainText(), needle, self.case_sensitive.isChecked()
         )
-        self.find_status.setText(f"Found {len(matches)} matches")
+        self.find_status.setText(f"Found {len(matches)} lines")
         return len(matches)
 
     def replace_current(self) -> None:
