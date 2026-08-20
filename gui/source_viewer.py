@@ -19,6 +19,8 @@ from PySide6.QtGui import (
 )
 from PySide6.QtWidgets import (
     QCheckBox,
+    QDialog,
+    QDialogButtonBox,
     QFileDialog,
     QHBoxLayout,
     QLabel,
@@ -30,6 +32,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from analyzer.backtest import BacktestSetup, suggest_setup, summary_text, to_set_content
 from analyzer.classifier import classify
 from analyzer.detector import detected_list
 from analyzer.mq5_parser import analyze_source, find_matches
@@ -218,6 +221,8 @@ class SourceViewer(QWidget):
         self.btn_copy = QPushButton("COPY")
         self.btn_save = QPushButton("SAVE MQ5")
         self.btn_open = QPushButton("OPEN URL")
+        self.btn_backtest = QPushButton("BACKTEST SETUP")
+        self.btn_backtest.setToolTip("Xem goi y symbol/timeframe/input va luu file .set cho Strategy Tester")
 
         self.btn_find.clicked.connect(self.find_next)
         self.btn_find_all.clicked.connect(self.count_matches)
@@ -226,6 +231,7 @@ class SourceViewer(QWidget):
         self.btn_copy.clicked.connect(self.copy_source)
         self.btn_save.clicked.connect(self.save_source)
         self.btn_open.clicked.connect(self.open_url)
+        self.btn_backtest.clicked.connect(self.show_backtest_setup)
         self.find_input.returnPressed.connect(self.find_next)
 
         self._build_layout()
@@ -246,6 +252,7 @@ class SourceViewer(QWidget):
         actions.addWidget(self.btn_copy)
         actions.addWidget(self.btn_save)
         actions.addWidget(self.btn_open)
+        actions.addWidget(self.btn_backtest)
         actions.addStretch(1)
 
         layout = QVBoxLayout(self)
@@ -285,8 +292,70 @@ class SourceViewer(QWidget):
             f"<b>Analysis:</b> Lines: {stats.lines} | Functions: {stats.functions} | "
             f"Inputs: {stats.inputs} | Includes: {stats.includes} | Classes: {stats.classes}<br>"
             f"<b>Detected:</b> {', '.join(features) or '-'}<br>"
-            f"<b>Strategy:</b> {', '.join(strategies)}"
+            f"<b>Strategy:</b> {', '.join(strategies)}<br>"
+            f"<b>Backtest:</b> {self._backtest_line()}"
         )
+
+    def _backtest_line(self) -> str:
+        setup = self.backtest_setup()
+        if setup is None:
+            return "-"
+        return (
+            f"Symbol: {', '.join(setup.symbols) or '-'} | "
+            f"Timeframe: {', '.join(setup.timeframes) or '-'} | "
+            f"Deposit: {setup.min_deposit or '-'} | Inputs: {len(setup.inputs)}"
+        )
+
+    # ------------------------------------------------------------------
+    def backtest_setup(self) -> BacktestSetup | None:
+        """Goi y backtest doc tu source dang mo (None neu chua co source)."""
+        code = self.editor.toPlainText()
+        if not code or code.startswith("// Source chua"):
+            return None
+        description = self.record.description if self.record else ""
+        return suggest_setup(code, description or "")
+
+    def show_backtest_setup(self) -> None:
+        setup = self.backtest_setup()
+        if setup is None:
+            QMessageBox.information(self, "Backtest setup", "Chua co source de phan tich.")
+            return
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Backtest setup")
+        dialog.resize(640, 520)
+        text = QPlainTextEdit(summary_text(setup))
+        text.setReadOnly(True)
+        text.setFont(QFont("Monospace", 9))
+        buttons = QDialogButtonBox(QDialogButtonBox.Close)
+        btn_set = QPushButton("Save .set")
+        buttons.addButton(btn_set, QDialogButtonBox.ActionRole)
+        buttons.rejected.connect(dialog.reject)
+        btn_set.clicked.connect(lambda: self.save_set_file(setup))
+        layout = QVBoxLayout(dialog)
+        layout.addWidget(QLabel("Goi y doc tu source (static analysis - khong dam bao loi nhuan):"))
+        layout.addWidget(text, 1)
+        layout.addWidget(buttons)
+        dialog.exec()
+
+    def save_set_file(self, setup: BacktestSetup | None = None) -> str:
+        """Luu file .set de nap vao Strategy Tester (Inputs > Load)."""
+        setup = setup or self.backtest_setup()
+        if setup is None:
+            return ""
+        stem = os.path.splitext(self.record.filename)[0] if self.record and self.record.filename else "setup"
+        default_name = sanitize_filename(f"{stem}.set")
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Save .set", os.path.join("output", "backtest", default_name), "Tester set (*.set)"
+        )
+        if not path:
+            return ""
+        os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+        title = self.record.name if self.record else stem
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write(to_set_content(setup, title=title))
+        self.find_status.setText(f"Saved: {os.path.basename(path)}")
+        self.saved.emit(path)
+        return path
 
     # ------------------------------------------------------------------
     def find_next(self) -> bool:

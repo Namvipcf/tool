@@ -76,3 +76,28 @@ def test_source_viewer_shows_code_and_search(app):
     viewer.replace_all()
     assert "OnTimer" in viewer.editor.toPlainText()
     assert "Analysis" in viewer.analysis.text()
+
+
+def test_source_viewer_backtest_setup(app, tmp_path):
+    viewer = SourceViewer()
+    record = SourceRecord(
+        source_id="2",
+        name="Gold EA",
+        filename="Gold_EA.mq5",
+        description="XAUUSD PERIOD_M5, deposit 1000",
+        source_code="input double Lots = 0.10;\nvoid OnTick(){}",
+        status=Status.DOWNLOADED,
+    )
+    viewer.show_record(record)
+    setup = viewer.backtest_setup()
+    assert setup is not None
+    assert "XAUUSD" in setup.symbols and "PERIOD_M5" in setup.timeframes
+    assert [p.name for p in setup.inputs] == ["Lots"]
+    assert "Backtest" in viewer.analysis.text()
+
+    out = tmp_path / "Gold_EA.set"
+    out.write_text("", encoding="utf-8")
+    from analyzer.backtest import to_set_content
+
+    out.write_text(to_set_content(setup, title=record.name), encoding="utf-8")
+    assert "Lots=0.10" in out.read_text(encoding="utf-8")

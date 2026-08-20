@@ -5,6 +5,8 @@ Cau truc output:
     output/
     |-- mq5/
     |   |-- EA_001.mq5
+    |-- backtest/
+    |   |-- EA_001.set
     |-- metadata.csv
     |-- metadata.xlsx
     |-- metadata.json
@@ -19,8 +21,9 @@ import os
 import shutil
 from collections.abc import Iterable, Sequence
 
+from analyzer.backtest import suggest_setup, to_set_content
 from models.source import SourceRecord
-from utils.filename import unique_path
+from utils.filename import sanitize_filename, unique_path
 from utils.logger import get_logger
 
 log = get_logger("exporter")
@@ -119,6 +122,29 @@ class Exporter:
         log.info("Da copy %d file source vao %s", count, target)
         return target
 
+    def export_backtest_sets(
+        self, records: Sequence[SourceRecord | dict], subdir: str = "backtest"
+    ) -> str:
+        """Tao file .set (Strategy Tester) cho tung source da tai ve."""
+        target = os.path.join(self.output_dir, subdir)
+        os.makedirs(target, exist_ok=True)
+        count = 0
+        for record in records:
+            row = record.to_row() if isinstance(record, SourceRecord) else dict(record)
+            src = row.get("local_path") or ""
+            if not src or not os.path.exists(src):
+                continue
+            with open(src, encoding="utf-8", errors="replace") as fh:
+                code = fh.read()
+            setup = suggest_setup(code, str(row.get("description") or ""))
+            stem = os.path.splitext(os.path.basename(src))[0]
+            dest = unique_path(target, sanitize_filename(f"{stem}.set"))
+            with open(dest, "w", encoding="utf-8") as fh:
+                fh.write(to_set_content(setup, title=str(row.get("name") or stem)))
+            count += 1
+        log.info("Da tao %d file .set backtest trong %s", count, target)
+        return target
+
     def export_database(self, db_path: str, filename: str = "database.db") -> str:
         dest = os.path.join(self.output_dir, filename)
         if os.path.abspath(db_path) != os.path.abspath(dest) and os.path.exists(db_path):
@@ -132,6 +158,7 @@ class Exporter:
             "csv": self.export_csv(records),
             "json": self.export_json(records),
             "mq5": self.export_mq5(records),
+            "backtest": self.export_backtest_sets(records),
         }
         try:
             out["xlsx"] = self.export_excel(records)

@@ -146,6 +146,7 @@ class MainWindow(QMainWindow):
             ("Export CSV", self.export_csv),
             ("Export Excel", self.export_excel),
             ("Export JSON", self.export_json),
+            ("Export Backtest .set", self.export_backtest),
             ("Export All", self.export_all),
         ):
             action = QAction(label, self)
@@ -287,6 +288,12 @@ class MainWindow(QMainWindow):
             return
         exporter = Exporter(target)
         self._notify_export("MQ5", exporter.export_mq5(self._records_for_export()))
+
+    def export_backtest(self) -> None:
+        """Tao file .set cho Strategy Tester tu cac source da tai."""
+        self._notify_export(
+            "Backtest .set", self._exporter().export_backtest_sets(self._records_for_export())
+        )
 
     def export_all(self) -> None:
         out = self._exporter().export_all(self._records_for_export(), self.settings.db_path)

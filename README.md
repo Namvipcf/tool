@@ -58,10 +58,15 @@ Selector HTML được xác minh trên trang thật:
   Buy/Sell, Grid, Martingale, ...` và phân loại chiến lược
   (`Trend Following, Scalping, Grid, Martingale, Breakout, Mean Reversion, News, Indicator Based, Unknown`).
   Đây chỉ là phân tích tĩnh, **không** kết luận source có lợi nhuận hay an toàn.
+- **Backtest setup** (nút `BACKTEST SETUP` trong source viewer): đọc từ source ra danh sách `input`
+  (tên, kiểu, giá trị mặc định, comment, group), symbol/timeframe/min deposit/leverage/magic nếu source
+  hoặc mô tả có nêu, gợi ý tick model, và cảnh báo grid/martingale. Lưu được file `.set` để nạp vào
+  **Strategy Tester** của MT5 (`Inputs > Load`). Menu `Export > Export Backtest .set` tạo `.set` cho
+  toàn bộ source đã tải (`output/backtest/`). Chỉ là static analysis, không phải tham số tối ưu.
 - **Queue + Start / Pause / Resume / Stop**, progress bar, log tab.
 - **Rate limit**: delay (mặc định 2s) + jitter, timeout 30s, retry 3 lần, exponential backoff;
   gặp `HTTP 429` -> tự dừng crawl và cảnh báo (không cố vượt giới hạn).
-- **Export**: MQ5 / CSV / Excel / JSON + copy database.
+- **Export**: MQ5 / CSV / Excel / JSON / Backtest `.set` + copy database.
 - **Logging**: console + file rotate `logs/crawler.log`.
 
 ## Chế độ CLI
@@ -90,13 +95,13 @@ mql5_source_crawler/
 ├── main.py                 # entry point (GUI + CLI)
 ├── gui/                    # main_window, search_widget, result_table, source_viewer, settings
 ├── crawler/                # crawler, search, downloader, parser, rate_limiter, http_client
-├── analyzer/               # mq5_parser, detector, classifier
+├── analyzer/               # mq5_parser, detector, classifier, backtest
 ├── database/database.py    # SQLite (table mq5_sources)
 ├── exporter/exporter.py    # CSV / XLSX / JSON / MQ5 / DB
 ├── models/source.py        # SourceRecord, SourceType, Status
 ├── utils/                  # logger, hashing, filename, robots
 ├── downloads/  logs/  output/
-├── tests/                  # pytest (38 test)
+├── tests/                  # pytest (45 test)
 ├── requirements.txt
 └── pyproject.toml          # cấu hình ruff + pytest
 ```
@@ -106,6 +111,7 @@ Output sau khi export:
 ```text
 output/
 ├── mq5/EA_xxx.mq5
+├── backtest/EA_xxx.set
 ├── metadata.csv
 ├── metadata.xlsx
 ├── metadata.json
@@ -115,7 +121,7 @@ output/
 ## Test & lint
 
 ```bash
-QT_QPA_PLATFORM=offscreen python -m pytest      # 38 passed
+QT_QPA_PLATFORM=offscreen python -m pytest      # 45 passed
 ruff check .
 ```
 

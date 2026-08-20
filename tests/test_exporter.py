@@ -56,8 +56,21 @@ def test_export_all_with_db(tmp_path):
     db_file.write_bytes(b"sqlite")
     exporter = Exporter(str(tmp_path / "out"))
     out = exporter.export_all([_record(tmp_path)], str(db_file))
-    assert set(out) >= {"csv", "json", "mq5", "db"}
+    assert set(out) >= {"csv", "json", "mq5", "backtest", "db"}
     assert os.path.exists(out["db"])
+
+
+def test_export_backtest_sets(tmp_path):
+    record = _record(tmp_path)
+    with open(record.local_path, "w", encoding="utf-8") as fh:
+        fh.write('input double Lots = 0.10;\nvoid OnTick(){}\n')
+    exporter = Exporter(str(tmp_path / "out"))
+    target = exporter.export_backtest_sets([record])
+    set_file = os.path.join(target, "Gold_EA.set")
+    assert os.path.exists(set_file)
+    with open(set_file, encoding="utf-8") as fh:
+        content = fh.read()
+    assert "Lots=0.10||0.10||0.01||0.10||N" in content
 
 
 def test_export_dict_rows(tmp_path):
